@@ -8,9 +8,9 @@
  */
 import QtQuick
 import QtQuick.Layouts
+import Qt5Compat.GraphicalEffects
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
-import org.kde.ksvg as KSvg
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.kwin as KWin
 
@@ -30,6 +30,7 @@ KWin.TabBoxSwitcher {
         location: PlasmaCore.Types.Floating
         visible: tabBox.visible
         flags: Qt.Popup | Qt.X11BypassWindowManagerHint
+        backgroundHints: PlasmaCore.Dialog.StandardBackground
         x: tabBox.screenGeometry.x + tabBox.screenGeometry.width * 0.5 - dialogMainItem.width * 0.5
         y: tabBox.screenGeometry.y + tabBox.screenGeometry.height * 0.5 - dialogMainItem.height * 0.5
 
@@ -39,18 +40,28 @@ KWin.TabBoxSwitcher {
 
             width: Math.min(Math.max(tabBox.screenGeometry.width * 0.3, icons.implicitWidth), tabBox.screenGeometry.width * 0.9)
 
+            Rectangle {
+                id: background
+                anchors.fill: parent
+                anchors.margins: -Kirigami.Units.largeSpacing
+                color: "#33DDDDDD"
+                radius: Kirigami.Units.cornerRadius
+                z: -1
+            }
+
             property int maxItemsPerRow:  Math.floor(tabBox.screenGeometry.width * 0.9 / icons.delegateWidth)
-            property int actualItemsPerRow:  Math.min(tabBox.model.rowCount(), maxItemsPerRow)
+            property int actualItemsPerRow:  Math.max(1, Math.min(tabBox.model.rowCount(), maxItemsPerRow))
 
             property int gridViewWidth: Math.max(4, actualItemsPerRow) * icons.delegateWidth
-            property int gridViewHeight: Math.ceil(tabBox.model.rowCount() / maxItemsPerRow) * icons.delegateHeight
+            property int gridViewHeight: Math.max(Math.ceil(tabBox.model.rowCount() / maxItemsPerRow), 1) * icons.delegateHeight
 
             GridView {
                 id: icons
 
-                readonly property int iconSize: Kirigami.Units.iconSizes.enormous
-                readonly property int delegateWidth: iconSize + (highlightItem ? highlightItem.margins.left + highlightItem.margins.right : 0)
-                readonly property int delegateHeight: iconSize + (highlightItem ? highlightItem.margins.top + highlightItem.margins.bottom : 0)
+                readonly property int iconSize: Math.round(Kirigami.Units.iconSizes.enormous * 0.75)
+                readonly property int iconPadding: Math.round(Kirigami.Units.largeSpacing * 1.25)
+                readonly property int delegateWidth: iconSize + iconPadding * 2
+                readonly property int delegateHeight: iconSize + iconPadding * 2
 
                 implicitWidth: dialogMainItem.actualItemsPerRow * delegateWidth
                 implicitHeight: dialogMainItem.gridViewHeight
@@ -67,14 +78,25 @@ KWin.TabBoxSwitcher {
                 keyNavigationWraps: true
 
                 model: tabBox.model
-                delegate: Kirigami.Icon {
+                delegate: Item {
                     property string caption: model.caption
+                    property string appName: {
+                        var name = model.resourceClass;
+                        if (!name) return model.caption;
+                        name = name.split('.').pop();
+                        return name.charAt(0).toUpperCase() + name.slice(1);
+                    }
 
                     width: icons.delegateWidth
                     height: icons.delegateHeight
 
-                    source: model.icon
-                    active: index == icons.currentIndex
+                    Kirigami.Icon {
+                        anchors.centerIn: parent
+                        width: icons.iconSize
+                        height: icons.iconSize
+                        source: model.icon
+                        active: index == icons.currentIndex
+                    }
 
                     Accessible.name: caption
 
@@ -90,20 +112,20 @@ KWin.TabBoxSwitcher {
                     }
                 }
 
-                highlight: KSvg.FrameSvgItem {
+                highlight: Rectangle {
                     id: highlightItem
-                    imagePath: "widgets/viewitem"
-                    prefix: "hover"
-                    width: icons.iconSize + margins.left + margins.right
-                    height: icons.iconSize + margins.top + margins.bottom
+                    width: icons.delegateWidth
+                    height: icons.delegateHeight
+                    color: Kirigami.Theme.highlightColor
+                    opacity: 0.2
+                    radius: Kirigami.Units.cornerRadius
                 }
 
-                Kirigami.PlaceholderMessage {
+                Kirigami.Icon {
                     anchors.centerIn: parent
-                    anchors.verticalCenterOffset: Math.round(captionLabel.height / 2)
-                    width: parent.width - Kirigami.Units.largeSpacing * 2
-                    icon.source: "edit-none"
-                    text: i18ndc("kwin", "@info:placeholder no entries in the task switcher", "No open windows")
+                    width: icons.iconSize
+                    height: icons.iconSize
+                    source: "org.kde.dolphin"
                     visible: icons.count === 0
                 }
 
@@ -111,17 +133,35 @@ KWin.TabBoxSwitcher {
                 boundsBehavior: Flickable.StopAtBounds
             }
 
-            PlasmaComponents3.Label {
-                id: captionLabel
-                text: icons.currentItem ? icons.currentItem.caption : ""
-                textFormat: Text.PlainText
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-                elide: Text.ElideMiddle
-                font.weight: Font.Bold
+            Item {
                 Layout.fillWidth: true
                 Layout.topMargin: Kirigami.Units.smallSpacing
                 Layout.bottomMargin: Kirigami.Units.smallSpacing
+                implicitHeight: captionLabel.implicitHeight
+
+                PlasmaComponents3.Label {
+                    id: captionLabel
+                    text: icons.currentItem ? icons.currentItem.appName : "Finder"
+                    textFormat: Text.PlainText
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideMiddle
+                    font.weight: Font.Bold
+                    width: Math.min(implicitWidth + Kirigami.Units.largeSpacing * 2, parent.width)
+                    x: {
+                        if (!icons.currentItem) return (parent.width - width) / 2;
+                        var itemCenterX = icons.currentItem.x + icons.delegateWidth / 2 - icons.contentX + icons.x;
+                        return Math.max(0, Math.min(itemCenterX - width / 2, parent.width - width));
+                    }
+                    layer.enabled: true
+                    layer.effect: DropShadow {
+                        horizontalOffset: 1
+                        verticalOffset: 1
+                        radius: 4
+                        samples: 9
+                        color: "#80000000"
+                    }
+                }
             }
 
             Connections {
