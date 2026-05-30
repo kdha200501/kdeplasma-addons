@@ -44,7 +44,7 @@ KWin.TabBoxSwitcher {
                 id: background
                 anchors.fill: parent
                 anchors.margins: -Kirigami.Units.largeSpacing
-                color: "#33DDDDDD"
+                color: "#80222222"
                 radius: Kirigami.Units.cornerRadius
                 z: -1
             }
@@ -116,8 +116,8 @@ KWin.TabBoxSwitcher {
                     id: highlightItem
                     width: icons.delegateWidth
                     height: icons.delegateHeight
-                    color: Kirigami.Theme.highlightColor
-                    opacity: 0.2
+                    color: "#FFFFFF"
+                    opacity: 0.35
                     radius: Kirigami.Units.cornerRadius
                 }
 
